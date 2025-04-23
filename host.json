@@ -1,0 +1,28 @@
+{
+    "version": "2.0",
+    "logging": {
+        "applicationInsights": {
+            "samplingSettings": {
+                "isEnabled": true,
+                "excludedTypes": "Request"
+            }
+        },
+        "logLevel": {
+            "default": "Information",
+            "Function": "Information"
+        }
+    },
+    "extensions": {
+        "blobs": {
+            "maxDegreeOfParallelism": 1
+        },
+        "serviceBus": {
+            "prefetchCount": 0,
+            "messageHandlerOptions": {
+                "autoComplete": true,
+                "maxConcurrentCalls": 1,
+                "maxAutoRenewDuration": "00:05:00"
+            }
+        }
+    }
+} 

@@ -1,0 +1,4 @@
+Local Testing:
+npx azurite (to run the azurite)
+Download Microsoft Azure Storage Explorer
+Run func start 
