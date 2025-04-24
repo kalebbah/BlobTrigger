@@ -84,14 +84,80 @@ namespace FunctionTrigger
                             continue;
                         }
 
-                        var existsCmd = new SqlCommand("SELECT COUNT(*) FROM [dbo].[users] WHERE employeeid = @employeeId", sqlConnection);
+                        var existsCmd = new SqlCommand("SELECT id FROM [dbo].[users] WHERE employeeid = @employeeId", sqlConnection);
                         existsCmd.Parameters.AddWithValue("@employeeId", employeeId ?? (object)DBNull.Value);
-                        var exists = (int)await existsCmd.ExecuteScalarAsync();
+                        var existingUserId = await existsCmd.ExecuteScalarAsync();
 
-                        if (exists > 0)
+                        if (existingUserId != null)
                         {
-                            _logger.LogInformation($"User {employeeId} already exists. Skipping.");
-                            skippedCount++;
+                            _logger.LogInformation($"User {employeeId} exists. Updating records.");
+                            
+                            // Update users table
+                            var updateUserCmd = new SqlCommand(@"
+                                UPDATE [dbo].[users] 
+                                SET firstname = @firstname,
+                                    lastname = @lastname,
+                                    username = @username,
+                                    email = @email,
+                                    role = @role,
+                                    employeeid = @employeeid,
+                                    fullname = @fullname,
+                                    employee = @employee
+                                WHERE id = @userId", sqlConnection);
+
+                            updateUserCmd.Parameters.AddWithValue("@firstname", (object?)firstName ?? DBNull.Value);
+                            updateUserCmd.Parameters.AddWithValue("@lastname", (object?)lastName ?? DBNull.Value);
+                            updateUserCmd.Parameters.AddWithValue("@username", (object?)username ?? DBNull.Value);
+                            updateUserCmd.Parameters.AddWithValue("@email", (object?)email ?? DBNull.Value);
+                            updateUserCmd.Parameters.AddWithValue("@role", Roles.registered.ToString());
+                            updateUserCmd.Parameters.AddWithValue("@employeeid", (object?)employeeId ?? DBNull.Value);
+                            updateUserCmd.Parameters.AddWithValue("@fullname", (object?)fullname ?? DBNull.Value);
+                            updateUserCmd.Parameters.AddWithValue("@employee", 1);
+                            updateUserCmd.Parameters.AddWithValue("@userId", existingUserId);
+
+                            await updateUserCmd.ExecuteNonQueryAsync();
+
+                            // Update userprofile table
+                            var updateUserProfileCmd = new SqlCommand(@"
+                                UPDATE [dbo].[userprofile] 
+                                SET phone = @phone,
+                                    email = @email,
+                                    employeeid = @employeeid
+                                WHERE userid = @userId", sqlConnection);
+
+                            updateUserProfileCmd.Parameters.AddWithValue("@phone", (object?)phone ?? DBNull.Value);
+                            updateUserProfileCmd.Parameters.AddWithValue("@email", (object?)email ?? DBNull.Value);
+                            updateUserProfileCmd.Parameters.AddWithValue("@employeeid", (object?)employeeId ?? DBNull.Value);
+                            updateUserProfileCmd.Parameters.AddWithValue("@userId", existingUserId);
+
+                            await updateUserProfileCmd.ExecuteNonQueryAsync();
+
+                            // Update employees table
+                            var updateEmployeeCmd = new SqlCommand(@"
+                                UPDATE [dbo].[employees] 
+                                SET employeeid = @employeeid,
+                                    fullname = @fullname,
+                                    employeeEmail = @employeeemail,
+                                    employeetenure = @employeetenure,
+                                    employeeidasint = @employeeidasint
+                                WHERE userid = @userId", sqlConnection);
+
+                            var employeeIdAsInt = 0;
+                            if (int.TryParse(employeeId, out int parsedId))
+                            {
+                                employeeIdAsInt = parsedId;
+                            }
+
+                            updateEmployeeCmd.Parameters.AddWithValue("@employeeid", (object?)employeeId ?? DBNull.Value);
+                            updateEmployeeCmd.Parameters.AddWithValue("@fullname", (object?)fullname ?? DBNull.Value);
+                            updateEmployeeCmd.Parameters.AddWithValue("@employeeemail", (object?)email ?? DBNull.Value);
+                            updateEmployeeCmd.Parameters.AddWithValue("@employeetenure", (object?)role ?? DBNull.Value);
+                            updateEmployeeCmd.Parameters.AddWithValue("@employeeidasint", (object?)employeeIdAsInt ?? DBNull.Value);
+                            updateEmployeeCmd.Parameters.AddWithValue("@userId", existingUserId);
+
+                            await updateEmployeeCmd.ExecuteNonQueryAsync();
+
+                            processedCount++;
                             continue;
                         }
 
@@ -128,11 +194,6 @@ namespace FunctionTrigger
                             INSERT INTO [dbo].[employees] (employeeid, fullname, employeeEmail, userid, employeetenure, employeeidasint)
                             VALUES (@employeeid, @fullname, @employeeemail, @userid, @employeetenure, @employeeidasint)", sqlConnection);
 
-                        var employeeIdAsInt = 0;
-                        if (int.TryParse(employeeId, out int parsedId))
-                        {
-                            employeeIdAsInt = parsedId;
-                        }
                         insertEmployeeCmd.Parameters.AddWithValue("@employeeid", (object?)employeeId ?? DBNull.Value);
                         insertEmployeeCmd.Parameters.AddWithValue("@fullname", (object?)fullname ?? DBNull.Value);
                         insertEmployeeCmd.Parameters.AddWithValue("@employeeemail", (object?)email ?? DBNull.Value);
