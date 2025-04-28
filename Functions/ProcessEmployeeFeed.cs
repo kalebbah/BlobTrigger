@@ -84,14 +84,62 @@ namespace FunctionTrigger
                             continue;
                         }
 
-                        var existsCmd = new SqlCommand("SELECT COUNT(*) FROM [dbo].[users] WHERE employeeid = @employeeId", sqlConnection);
+                        var existsCmd = new SqlCommand("SELECT id FROM [dbo].[users] WHERE employeeid = @employeeId", sqlConnection);
                         existsCmd.Parameters.AddWithValue("@employeeId", employeeId ?? (object)DBNull.Value);
-                        var exists = (int)await existsCmd.ExecuteScalarAsync();
+                        var existingUserId = await existsCmd.ExecuteScalarAsync();
 
-                        if (exists > 0)
+                        if (existingUserId != null)
                         {
-                            _logger.LogInformation($"User {employeeId} already exists. Skipping.");
-                            skippedCount++;
+                            _logger.LogInformation($"User {employeeId} exists. Updating records.");
+
+                            // Update users table
+                            var updateUserCmd = new SqlCommand(@"
+                                UPDATE [dbo].[users] 
+                                SET firstname = @firstname,
+                                    lastname = @lastname,
+                                    username = @username,
+                                    email = @email,
+                                    fullname = @fullname
+                                WHERE id = @userId", sqlConnection);
+
+                            updateUserCmd.Parameters.AddWithValue("@firstname", (object?)firstName ?? DBNull.Value);
+                            updateUserCmd.Parameters.AddWithValue("@lastname", (object?)lastName ?? DBNull.Value);
+                            updateUserCmd.Parameters.AddWithValue("@username", (object?)username ?? DBNull.Value);
+                            updateUserCmd.Parameters.AddWithValue("@email", (object?)email ?? DBNull.Value);
+                            updateUserCmd.Parameters.AddWithValue("@fullname", (object?)fullname ?? DBNull.Value);
+                            updateUserCmd.Parameters.AddWithValue("@userId", existingUserId);
+
+                            await updateUserCmd.ExecuteNonQueryAsync();
+
+                            // Update userprofile table
+                            var updateUserProfileCmd = new SqlCommand(@"
+                                UPDATE [dbo].[userprofile] 
+                                SET phone = @phone,
+                                    email = @email
+                                WHERE userid = @userId", sqlConnection);
+
+                            updateUserProfileCmd.Parameters.AddWithValue("@phone", (object?)phone ?? DBNull.Value);
+                            updateUserProfileCmd.Parameters.AddWithValue("@email", (object?)email ?? DBNull.Value);
+                            updateUserProfileCmd.Parameters.AddWithValue("@userId", existingUserId);
+
+                            await updateUserProfileCmd.ExecuteNonQueryAsync();
+
+                            // Update employees table
+                            var updateEmployeeCmd = new SqlCommand(@"
+                                UPDATE [dbo].[employees] 
+                                SET fullname = @fullname,
+                                    employeeEmail = @employeeemail,
+                                    employeetenure = @employeetenure
+                                WHERE userid = @userId", sqlConnection);
+
+                            updateEmployeeCmd.Parameters.AddWithValue("@fullname", (object?)fullname ?? DBNull.Value);
+                            updateEmployeeCmd.Parameters.AddWithValue("@employeeemail", (object?)email ?? DBNull.Value);
+                            updateEmployeeCmd.Parameters.AddWithValue("@employeetenure", (object?)role ?? DBNull.Value);
+                            updateEmployeeCmd.Parameters.AddWithValue("@userId", existingUserId);
+
+                            await updateEmployeeCmd.ExecuteNonQueryAsync();
+
+                            processedCount++;
                             continue;
                         }
 
