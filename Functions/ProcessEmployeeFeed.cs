@@ -71,15 +71,15 @@ namespace FunctionTrigger
                         var employeeId = GetValue(row, 1)?.ToString();
                         var firstName = GetValue(row, 2);
                         var lastName = GetValue(row, 3);
-                        var email = GetValue(row, 4);
+                        var email_ = GetValue(row, 4);
                         var phone = GetValue(row, 5);
                         var role = GetValue(row, 7);
                         var username = GetValue(row, 8);
                         var fullname = $"{firstName} {lastName}".Trim();
 
-                        if (string.IsNullOrEmpty(employeeId) || string.IsNullOrEmpty(email))
+                        if (string.IsNullOrEmpty(employeeId) || string.IsNullOrEmpty(email_))
                         {
-                            _logger.LogWarning($"Skipping row due to missing required data. EmployeeId: {employeeId}, Email: {email}");
+                            _logger.LogWarning($"Skipping row due to missing required data. EmployeeId: {employeeId}, Email: {email_}");
                             skippedCount++;
                             continue;
                         }
@@ -105,7 +105,7 @@ namespace FunctionTrigger
                             updateUserCmd.Parameters.AddWithValue("@firstname", (object?)firstName ?? DBNull.Value);
                             updateUserCmd.Parameters.AddWithValue("@lastname", (object?)lastName ?? DBNull.Value);
                             updateUserCmd.Parameters.AddWithValue("@username", (object?)username ?? DBNull.Value);
-                            updateUserCmd.Parameters.AddWithValue("@email", (object?)email ?? DBNull.Value);
+                            updateUserCmd.Parameters.AddWithValue("@email", (object?)email_ ?? DBNull.Value);
                             updateUserCmd.Parameters.AddWithValue("@fullname", (object?)fullname ?? DBNull.Value);
                             updateUserCmd.Parameters.AddWithValue("@userId", existingUserId);
 
@@ -119,7 +119,7 @@ namespace FunctionTrigger
                                 WHERE userid = @userId", sqlConnection);
 
                             updateUserProfileCmd.Parameters.AddWithValue("@phone", (object?)phone ?? DBNull.Value);
-                            updateUserProfileCmd.Parameters.AddWithValue("@email", (object?)email ?? DBNull.Value);
+                            updateUserProfileCmd.Parameters.AddWithValue("@email", (object?)email_ ?? DBNull.Value);
                             updateUserProfileCmd.Parameters.AddWithValue("@userId", existingUserId);
 
                             await updateUserProfileCmd.ExecuteNonQueryAsync();
@@ -133,7 +133,7 @@ namespace FunctionTrigger
                                 WHERE userid = @userId", sqlConnection);
 
                             updateEmployeeCmd.Parameters.AddWithValue("@fullname", (object?)fullname ?? DBNull.Value);
-                            updateEmployeeCmd.Parameters.AddWithValue("@employeeemail", (object?)email ?? DBNull.Value);
+                            updateEmployeeCmd.Parameters.AddWithValue("@employeeemail", (object?)email_ ?? DBNull.Value);
                             updateEmployeeCmd.Parameters.AddWithValue("@employeetenure", (object?)role ?? DBNull.Value);
                             updateEmployeeCmd.Parameters.AddWithValue("@userId", existingUserId);
 
@@ -152,7 +152,7 @@ namespace FunctionTrigger
                         insertUserCmd.Parameters.AddWithValue("@firstname", (object?)firstName ?? DBNull.Value);
                         insertUserCmd.Parameters.AddWithValue("@lastname", (object?)lastName ?? DBNull.Value);
                         insertUserCmd.Parameters.AddWithValue("@username", (object?)username ?? DBNull.Value);
-                        insertUserCmd.Parameters.AddWithValue("@email", (object?)email ?? DBNull.Value);
+                        insertUserCmd.Parameters.AddWithValue("@email", (object?)email_ ?? DBNull.Value);
                         insertUserCmd.Parameters.AddWithValue("@role", Roles.registered.ToString());
                         insertUserCmd.Parameters.AddWithValue("@hashedpassword", BCrypt.Net.BCrypt.HashPassword(_defaultPassword));
                         insertUserCmd.Parameters.AddWithValue("@employeeid", (object?)employeeId ?? DBNull.Value);
@@ -173,7 +173,7 @@ namespace FunctionTrigger
                             VALUES (@phone, @email, @employeeid, @userid)", sqlConnection);
 
                         insertUserProfileCmd.Parameters.AddWithValue("@phone", (object?)phone ?? DBNull.Value);
-                        insertUserProfileCmd.Parameters.AddWithValue("@email", (object?)email ?? DBNull.Value);
+                        insertUserProfileCmd.Parameters.AddWithValue("@email", (object?)email_ ?? DBNull.Value);
                         insertUserProfileCmd.Parameters.AddWithValue("@employeeid", (object?)employeeId ?? DBNull.Value);
                         insertUserProfileCmd.Parameters.AddWithValue("@userid", newUserId);
 
@@ -190,7 +190,7 @@ namespace FunctionTrigger
                         }
                         insertEmployeeCmd.Parameters.AddWithValue("@employeeid", (object?)employeeId ?? DBNull.Value);
                         insertEmployeeCmd.Parameters.AddWithValue("@fullname", (object?)fullname ?? DBNull.Value);
-                        insertEmployeeCmd.Parameters.AddWithValue("@employeeemail", (object?)email ?? DBNull.Value);
+                        insertEmployeeCmd.Parameters.AddWithValue("@employeeemail", (object?)email_ ?? DBNull.Value);
                         insertEmployeeCmd.Parameters.AddWithValue("@userid", newUserId);
                         insertEmployeeCmd.Parameters.AddWithValue("@employeetenure", (object?)role ?? DBNull.Value);
                         insertEmployeeCmd.Parameters.AddWithValue("@employeeidasint", (object?)employeeIdAsInt ?? DBNull.Value);
@@ -199,7 +199,7 @@ namespace FunctionTrigger
 
                         var emailPayload = new
                         {
-                            To = email,
+                            email = email_,
                             Subject = "Welcome to the CertAthon Certification Portal",
                             Body = $"Hello {firstName},\n\nYour temporary password is: {_defaultPassword}"
                         };
