@@ -28,15 +28,15 @@ namespace FunctionTrigger
         public ProcessEmployeeFeed(ILogger<ProcessEmployeeFeed> logger)
         {
             _logger = logger;
-            _sqlConnectionString = System.Environment.GetEnvironmentVariable("SqlConnectionString", EnvironmentVariableTarget.Process) 
+            _sqlConnectionString = System.Environment.GetEnvironmentVariable("SqlConnectionString", EnvironmentVariableTarget.Process)
                 ?? throw new InvalidOperationException("SqlConnectionString not configured");
-            _serviceBusConnection = System.Environment.GetEnvironmentVariable("ServiceBusConnection", EnvironmentVariableTarget.Process) 
+            _serviceBusConnection = System.Environment.GetEnvironmentVariable("ServiceBusConnection", EnvironmentVariableTarget.Process)
                 ?? throw new InvalidOperationException("ServiceBusConnection not configured");
         }
 
         [Function(nameof(ProcessEmployeeFeed))]
         public async Task Run(
-            [BlobTrigger("uploads/{name}", Connection = "ExternalBlobStorageConnection")] Stream blobStream,
+            [BlobTrigger("employees/{name}", Connection = "ExternalBlobStorageConnection")] Stream blobStream,
             string name,
             FunctionContext context)
         {
@@ -68,7 +68,7 @@ namespace FunctionTrigger
                 {
                     try
                     {
-                        var employeeId = GetValue(row, 1);
+                        var employeeId = GetValue(row, 1)?.ToString();
                         var firstName = GetValue(row, 2);
                         var lastName = GetValue(row, 3);
                         var email = GetValue(row, 4);
@@ -91,7 +91,7 @@ namespace FunctionTrigger
                         if (existingUserId != null)
                         {
                             _logger.LogInformation($"User {employeeId} exists. Updating records.");
-                            
+
                             // Update users table
                             var updateUserCmd = new SqlCommand(@"
                                 UPDATE [dbo].[users] 
@@ -99,20 +99,15 @@ namespace FunctionTrigger
                                     lastname = @lastname,
                                     username = @username,
                                     email = @email,
-                                    role = @role,
-                                    employeeid = @employeeid,
-                                    fullname = @fullname,
-                                    employee = @employee
+                                    fullname = @fullname
                                 WHERE id = @userId", sqlConnection);
 
                             updateUserCmd.Parameters.AddWithValue("@firstname", (object?)firstName ?? DBNull.Value);
                             updateUserCmd.Parameters.AddWithValue("@lastname", (object?)lastName ?? DBNull.Value);
                             updateUserCmd.Parameters.AddWithValue("@username", (object?)username ?? DBNull.Value);
                             updateUserCmd.Parameters.AddWithValue("@email", (object?)email ?? DBNull.Value);
-                            updateUserCmd.Parameters.AddWithValue("@role", Roles.registered.ToString());
-                            updateUserCmd.Parameters.AddWithValue("@employeeid", (object?)employeeId ?? DBNull.Value);
+
                             updateUserCmd.Parameters.AddWithValue("@fullname", (object?)fullname ?? DBNull.Value);
-                            updateUserCmd.Parameters.AddWithValue("@employee", 1);
                             updateUserCmd.Parameters.AddWithValue("@userId", existingUserId);
 
                             await updateUserCmd.ExecuteNonQueryAsync();
@@ -121,13 +116,11 @@ namespace FunctionTrigger
                             var updateUserProfileCmd = new SqlCommand(@"
                                 UPDATE [dbo].[userprofile] 
                                 SET phone = @phone,
-                                    email = @email,
-                                    employeeid = @employeeid
+                                    email = @email
                                 WHERE userid = @userId", sqlConnection);
 
                             updateUserProfileCmd.Parameters.AddWithValue("@phone", (object?)phone ?? DBNull.Value);
                             updateUserProfileCmd.Parameters.AddWithValue("@email", (object?)email ?? DBNull.Value);
-                            updateUserProfileCmd.Parameters.AddWithValue("@employeeid", (object?)employeeId ?? DBNull.Value);
                             updateUserProfileCmd.Parameters.AddWithValue("@userId", existingUserId);
 
                             await updateUserProfileCmd.ExecuteNonQueryAsync();
@@ -135,24 +128,16 @@ namespace FunctionTrigger
                             // Update employees table
                             var updateEmployeeCmd = new SqlCommand(@"
                                 UPDATE [dbo].[employees] 
-                                SET employeeid = @employeeid,
-                                    fullname = @fullname,
+
+                                SET fullname = @fullname,
                                     employeeEmail = @employeeemail,
-                                    employeetenure = @employeetenure,
-                                    employeeidasint = @employeeidasint
+                                    employeetenure = @employeetenure
                                 WHERE userid = @userId", sqlConnection);
 
-                            var employeeIdAsInt = 0;
-                            if (int.TryParse(employeeId, out int parsedId))
-                            {
-                                employeeIdAsInt = parsedId;
-                            }
-
-                            updateEmployeeCmd.Parameters.AddWithValue("@employeeid", (object?)employeeId ?? DBNull.Value);
                             updateEmployeeCmd.Parameters.AddWithValue("@fullname", (object?)fullname ?? DBNull.Value);
                             updateEmployeeCmd.Parameters.AddWithValue("@employeeemail", (object?)email ?? DBNull.Value);
                             updateEmployeeCmd.Parameters.AddWithValue("@employeetenure", (object?)role ?? DBNull.Value);
-                            updateEmployeeCmd.Parameters.AddWithValue("@employeeidasint", (object?)employeeIdAsInt ?? DBNull.Value);
+
                             updateEmployeeCmd.Parameters.AddWithValue("@userId", existingUserId);
 
                             await updateEmployeeCmd.ExecuteNonQueryAsync();
@@ -164,8 +149,8 @@ namespace FunctionTrigger
                         byte employee = 1; // or 0, depending on logic
                         var insertUserCmd = new SqlCommand(@"
                             INSERT INTO [dbo].[users] (firstname, lastname, username, email, role, hashedpassword, employeeid, fullname, employee)
-                            OUTPUT INSERTED.id
-                            VALUES (@firstname, @lastname, @username, @email, @role, @hashedpassword, @employeeid, @fullname, @employee)", sqlConnection);
+                            VALUES (@firstname, @lastname, @username, @email, @role, @hashedpassword, @employeeid, @fullname, @employee);
+                            SELECT SCOPE_IDENTITY();", sqlConnection);
 
                         insertUserCmd.Parameters.AddWithValue("@firstname", (object?)firstName ?? DBNull.Value);
                         insertUserCmd.Parameters.AddWithValue("@lastname", (object?)lastName ?? DBNull.Value);
@@ -177,7 +162,14 @@ namespace FunctionTrigger
                         insertUserCmd.Parameters.AddWithValue("@fullname", (object?)fullname ?? DBNull.Value);
                         insertUserCmd.Parameters.AddWithValue("@employee", employee);
 
-                        var newUserId = (int)await insertUserCmd.ExecuteScalarAsync();
+                        var newUserId = Convert.ToInt32(await insertUserCmd.ExecuteScalarAsync());
+
+                        if (newUserId <= 0)
+                        {
+                            _logger.LogWarning($"Failed to insert user {employeeId}. Skipping.");
+                            skippedCount++;
+                            continue;
+                        }
 
                         var insertUserProfileCmd = new SqlCommand(@"
                             INSERT INTO [dbo].[userprofile] (phone, email, employeeid, userid)
