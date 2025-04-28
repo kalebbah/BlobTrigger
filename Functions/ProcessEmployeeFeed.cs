@@ -106,6 +106,7 @@ namespace FunctionTrigger
                             updateUserCmd.Parameters.AddWithValue("@lastname", (object?)lastName ?? DBNull.Value);
                             updateUserCmd.Parameters.AddWithValue("@username", (object?)username ?? DBNull.Value);
                             updateUserCmd.Parameters.AddWithValue("@email", (object?)email ?? DBNull.Value);
+
                             updateUserCmd.Parameters.AddWithValue("@fullname", (object?)fullname ?? DBNull.Value);
                             updateUserCmd.Parameters.AddWithValue("@userId", existingUserId);
 
@@ -127,6 +128,7 @@ namespace FunctionTrigger
                             // Update employees table
                             var updateEmployeeCmd = new SqlCommand(@"
                                 UPDATE [dbo].[employees] 
+
                                 SET fullname = @fullname,
                                     employeeEmail = @employeeemail,
                                     employeetenure = @employeetenure
@@ -135,6 +137,7 @@ namespace FunctionTrigger
                             updateEmployeeCmd.Parameters.AddWithValue("@fullname", (object?)fullname ?? DBNull.Value);
                             updateEmployeeCmd.Parameters.AddWithValue("@employeeemail", (object?)email ?? DBNull.Value);
                             updateEmployeeCmd.Parameters.AddWithValue("@employeetenure", (object?)role ?? DBNull.Value);
+
                             updateEmployeeCmd.Parameters.AddWithValue("@userId", existingUserId);
 
                             await updateEmployeeCmd.ExecuteNonQueryAsync();
@@ -183,11 +186,6 @@ namespace FunctionTrigger
                             INSERT INTO [dbo].[employees] (employeeid, fullname, employeeEmail, userid, employeetenure, employeeidasint)
                             VALUES (@employeeid, @fullname, @employeeemail, @userid, @employeetenure, @employeeidasint)", sqlConnection);
 
-                        var employeeIdAsInt = 0;
-                        if (int.TryParse(employeeId, out int parsedId))
-                        {
-                            employeeIdAsInt = parsedId;
-                        }
                         insertEmployeeCmd.Parameters.AddWithValue("@employeeid", (object?)employeeId ?? DBNull.Value);
                         insertEmployeeCmd.Parameters.AddWithValue("@fullname", (object?)fullname ?? DBNull.Value);
                         insertEmployeeCmd.Parameters.AddWithValue("@employeeemail", (object?)email ?? DBNull.Value);
